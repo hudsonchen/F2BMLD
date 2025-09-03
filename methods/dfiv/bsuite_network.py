@@ -61,11 +61,11 @@ class InstrumentalFeature(nn.Module):
     def forward(self, obs: torch.Tensor, act: torch.Tensor) -> torch.Tensor:
         feat = self._net[0](obs, act)  # CriticMultiplexer
         feat = self._net[1](feat)      # MLP
-        # feat = add_const_col(feat)
+        feat = add_const_col(feat)
         return feat
 
     def feature_dim(self) -> int:
-        return self._feature_dim
+        return self._feature_dim + 1
 
 
 class ValueFeature(nn.Module):
@@ -86,12 +86,12 @@ class ValueFunction(nn.Module):
     def __init__(self, environment_spec: dict, layer_sizes: Sequence[int]):
         super().__init__()
         self._feature = ValueFeature(environment_spec, layer_sizes)
-        feat_dim = layer_sizes[-1]
+        feat_dim = layer_sizes[-1] + 1
         self._weight = nn.Parameter(torch.zeros(feat_dim, 1))
 
     def forward(self, obs: torch.Tensor, act: torch.Tensor) -> torch.Tensor:
         feat = self._feature(obs, act)
-        # feat = add_const_col(feat)
+        feat = add_const_col(feat)
         return feat @ self._weight
 
     def feature_dim(self) -> int:

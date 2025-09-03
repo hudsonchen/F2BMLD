@@ -130,7 +130,8 @@ def main():
                 environment=env,
                 num_init_samples=config.evaluate_init_samples,
                 discount=0.99,
-                mse_samples=100
+                mse_samples=100,
+                device=device,
                 )
             )
             eval_logger.write(eval_results)

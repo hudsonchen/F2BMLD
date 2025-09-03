@@ -77,7 +77,7 @@ class DFIVLearner:
         self.stage1_weight = torch.zeros(
             instrumental_feature.feature_dim(), value_func.feature_dim(),
             requires_grad=False
-        )
+        ).to(device)
         self.device = device
         self._num_steps = 0
 
@@ -103,7 +103,8 @@ class DFIVLearner:
 
     def update_instrumental(self, current_obs, action, reward, dones, next_obs):
         next_action = self.policy(next_obs)
-        target = self.value_feature(next_obs, next_action) * (1 - dones[:, None])
+        target = add_const_col(self.value_feature(current_obs, action))
+        target = target - self.discount * (1 - dones[:, None]) * add_const_col(self.value_feature(next_obs, next_action))
 
         feature = self.instrumental_feature(current_obs, action)
         # Ridge regression loss approximation
@@ -124,11 +125,14 @@ class DFIVLearner:
         instrumental_feature_1st = self.instrumental_feature(current_obs_1st, action_1st)
         instrumental_feature_2nd = self.instrumental_feature(current_obs_2nd, action_2nd)
 
-        target_1st = self.value_feature(next_obs_1st, next_action_1st) * (1 - dones_1st[:, None])
+        target_1st = add_const_col(self.value_feature(current_obs_1st, action_1st))
+        target_1st = target_1st - self.discount * (1 - dones_1st[:, None]) * add_const_col(
+            self.value_feature(next_obs_1st, next_action_1st) * (1 - dones_1st[:, None])
+        )
+    
         stage1_weight = fit_linear(target_1st, instrumental_feature_1st, self.stage1_reg)
 
-        predicted_feature = self.value_feature(current_obs_2nd, action_2nd)
-        predicted_feature = predicted_feature - self.discount * (1 - dones_2nd[:, None]) * linear_reg_pred(instrumental_feature_2nd, stage1_weight)
+        predicted_feature = linear_reg_pred(instrumental_feature_2nd, stage1_weight)
         stage2_weight = self.value_func._weight.data
         predict = linear_reg_pred(predicted_feature, stage2_weight)
         loss = ((reward_2nd.unsqueeze(-1) - predict) ** 2).mean()
@@ -147,12 +151,12 @@ class DFIVLearner:
         instrumental_feature_1st = self.instrumental_feature(current_obs_1st, action_1st)
         instrumental_feature_2nd = self.instrumental_feature(current_obs_2nd, action_2nd)
 
-        target_1st = self.value_feature(next_obs_1st, next_action_1st) * (1 - dones_1st[:, None])
+        target_1st = add_const_col(self.value_feature(current_obs_1st, action_1st)) 
+        target_1st = target_1st - self.discount * (1 - dones_1st[:, None]) * add_const_col(self.value_feature(next_obs_1st, next_action_1st))
         stage1_weight = fit_linear(target_1st, instrumental_feature_1st, self.stage1_reg)
         self.stage1_weight = stage1_weight.detach()
 
-        predicted_feature = self.value_feature(current_obs_2nd, action_2nd)
-        predicted_feature -= self.discount * (1 - dones_2nd[:, None]) * linear_reg_pred(instrumental_feature_2nd, stage1_weight)
+        predicted_feature = linear_reg_pred(instrumental_feature_2nd, stage1_weight)
         stage2_weight = fit_linear(reward_2nd.unsqueeze(-1), predicted_feature, self.stage2_reg)
         self.value_func._weight.data = stage2_weight
         return stage1_weight, stage2_weight
@@ -185,6 +189,7 @@ class DFIVLearner:
         count = 0.0
 
         for sample in valid_input:
+            sample = [s.to(self.device) for s in sample]
             current_obs, action, reward, done, _ = sample[:5]
 
             # Forward pass through instrumental net
@@ -193,8 +198,7 @@ class DFIVLearner:
             )
 
             # Stage 1 linear regression prediction
-            predicted_feature = self.value_feature(current_obs, action)
-            predicted_feature -= self.discount * (1 - done[:, None]) * linear_reg_pred(instrumental_feature, stage1_weight)
+            predicted_feature = linear_reg_pred(instrumental_feature, stage1_weight)
 
             # Stage 2 linear regression prediction
             predict = linear_reg_pred(predicted_feature, stage2_weight)
