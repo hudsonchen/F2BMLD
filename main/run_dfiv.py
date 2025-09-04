@@ -16,8 +16,8 @@ import matplotlib.pyplot as plt
 @dataclass
 class Config:
     dataset_path: str
-    value_layer_sizes: str = "50,50"
-    instrumental_layer_sizes: str = "50,50"
+    value_layer_sizes: str = "50"
+    instrumental_layer_sizes: str = "50"
     batch_size: int = 1024
     value_learning_rate: float = 1e-4
     instrumental_learning_rate: float = 1e-3
@@ -28,7 +28,7 @@ class Config:
     instrumental_iter: int = 1
     value_iter: int = 1
     max_dev_size: int = 10 * 1024
-    evaluate_every: int = 1000
+    evaluate_every: int = 100
     evaluate_init_samples: int = 1000
     max_steps: int = 100_000
     noise_level: float = 0.1
@@ -140,7 +140,7 @@ def main():
         logger=logger)
     
     truth_value = utils.estimate_true_value(
-        partial(target_policy, policy_dqn=policy_dqn), env, discount=0.99, num_episodes=1000, device=device
+        partial(target_policy, policy_dqn=policy_dqn), env, discount=0.99, num_episodes=100, device=device
     )
     print(f"Ground-truth policy value: {truth_value}")
 

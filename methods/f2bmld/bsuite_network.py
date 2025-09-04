@@ -74,8 +74,8 @@ class TreatmentNetwork(nn.Module):
 
 def make_network_bsuite(
     environment_spec: dict,
-    treatment_layer_sizes: str = "50, 1",
-    instrument_layer_sizes: str = "50, 1",
+    treatment_layer_sizes: str,
+    instrument_layer_sizes: str,
     device: str = "cpu"
 ) -> Tuple[nn.Module, nn.Module]:
     treatment_sizes = list(map(int, treatment_layer_sizes.split(",")))

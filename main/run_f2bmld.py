@@ -12,30 +12,19 @@ from functools import partial
 from dataclasses import dataclass
 import pandas as pd
 import matplotlib.pyplot as plt
+import argparse
+import json
 
-@dataclass
-class Config:
-    dataset_path: str
-    treatment_layer_sizes: str = "50, 50, 1"
-    instrument_layer_sizes: str = "50, 50, 1"
-    batch_size: int = 1024
-    treatment_learning_rate: float = 1e-3
-    instrument_learning_rate: float = 1e-3
-    stage1_reg: float = 1e-5
-    stage2_reg: float = 1e-5
-    instrument_reg: float = 1e-5
-    treatment_reg: float = 1e-5
-    lagrange_reg: float=1.0
-    instrument_iter: int = 100
-    treatment_iter: int = 1
-    max_dev_size: int = 10 * 1024
-    evaluate_every: int = 100
-    evaluate_init_samples: int = 1000
-    max_steps: int = 100_000
-    noise_level: float = 0.1
-    policy_noise_level: float = 0.0
-    
-config = Config(dataset_path=str(ROOT_PATH / "offline_dataset" / "stochastic"))
+seed = 0
+# PyTorch
+torch.manual_seed(seed)
+torch.cuda.manual_seed(seed)           # for a single GPU
+torch.cuda.manual_seed_all(seed)       # for all GPUs
+
+# Ensures deterministic behavior (may reduce performance)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def target_policy(obs_batch: torch.Tensor, policy_dqn: torch.nn.Module) -> torch.Tensor:
@@ -57,7 +46,7 @@ def behavior_policy(obs_batch: torch.Tensor, policy_dqn: torch.nn.Module, epsilo
     return final_actions
 
 
-def main():
+def main(config):
     policy_dqn = utils.load_pretrained_dqn("policy_net.pth", device=device)
 
     dataset_loader, dev_loader, env, env_spec = utils.load_data_and_env(
@@ -80,8 +69,14 @@ def main():
 
     counter = Counter()
     log_dir=f'./results/f2bmld_env_noise_{config.noise_level}__policy_noise_{config.policy_noise_level}'
+    log_dir += f'__lagrange_{config.lagrange_reg}__stage1_reg_{config.stage1_reg}__stage2_reg_{config.stage2_reg}'
+    log_dir += f'__treat_lr_{config.treatment_learning_rate}__instr_lr_{config.instrument_learning_rate}'
+    log_dir += f'__instr_iter_{config.instrument_iter}__instr_tilde_iter_{config.instrument_tilde_iter}'
+    log_dir += f'__bs_{config.batch_size}'
     logger = StandardLogger(name='train', log_dir=log_dir)
     eval_logger = StandardLogger(name='val', log_dir=log_dir)
+    logger.write(vars(config))
+
 
     learner = f2bmld.F2BMLDLearner(
         treatment_net=treatment_net,
@@ -95,6 +90,7 @@ def main():
         stage2_reg=config.stage2_reg,
         lagrange_reg=config.lagrange_reg,
         instrument_iter=config.instrument_iter,
+        instrument_tilde_iter=config.instrument_tilde_iter,
         treatment_iter=config.treatment_iter,
         dataset=dataset_loader,
         device=device,
@@ -159,6 +155,7 @@ def main():
             eval_logs.append(eval_results)
 
             logger.write(train_results)
+
             # --- Convert to DataFrame ---
             train_df = pd.DataFrame(train_logs)
             eval_df = pd.DataFrame(eval_logs)
@@ -191,4 +188,27 @@ def main():
             break
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("--treatment_layer_sizes", type=str, default="50,1")
+    parser.add_argument("--instrument_layer_sizes", type=str, default="50,1")
+    parser.add_argument("--batch_size", type=int, default=32)
+    parser.add_argument("--treatment_learning_rate", type=float, default=1e-3)
+    parser.add_argument("--instrument_learning_rate", type=float, default=1e-3)
+    parser.add_argument("--stage1_reg", type=float, default=1e-5)
+    parser.add_argument("--stage2_reg", type=float, default=1e-5)
+    parser.add_argument("--stage1_ent", type=float, default=0.1)
+    parser.add_argument("--stage2_ent", type=float, default=0.1)
+    parser.add_argument("--lagrange_reg", type=float, default=0.3)
+    parser.add_argument("--instrument_iter", type=int, default=10)
+    parser.add_argument("--instrument_tilde_iter", type=int, default=10)
+    parser.add_argument("--treatment_iter", type=int, default=1)
+    parser.add_argument("--max_dev_size", type=int, default=10 * 1024)
+    parser.add_argument("--evaluate_every", type=int, default=100)
+    parser.add_argument("--evaluate_init_samples", type=int, default=1000)
+    parser.add_argument("--max_steps", type=int, default=5000)
+    parser.add_argument("--noise_level", type=float, default=0.1)
+    parser.add_argument("--policy_noise_level", type=float, default=0.0)
+
+    config = parser.parse_args()
+    main(config)

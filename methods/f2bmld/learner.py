@@ -1,9 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import numpy as np
-from typing import Dict, Tuple
-
 
 
 class F2BMLDLearner:
@@ -20,6 +17,7 @@ class F2BMLDLearner:
         stage2_reg: float,
         lagrange_reg: float,
         instrument_iter: int,
+        instrument_tilde_iter: int,
         treatment_iter: int,
         dataset: torch.utils.data.DataLoader,
         device: str = "cpu",
@@ -30,6 +28,7 @@ class F2BMLDLearner:
         self.stage2_reg = stage2_reg
         self.lagrange_reg = lagrange_reg
         self.instrument_iter = instrument_iter
+        self.instrument_tilde_iter = instrument_tilde_iter
         self.treatment_iter = treatment_iter
         self.discount = discount
         self.treatment_net = treatment_net
@@ -45,7 +44,8 @@ class F2BMLDLearner:
         self._instrument_optimizer = optim.Adam(self.instrument_net.parameters(),
                                                   lr=instrument_learning_rate, betas=(0.5, 0.9))
         self._instrument_tilde_optimizer = optim.Adam(self.instrument_tilde_net.parameters(),
-                                                  lr=instrument_learning_rate * 2, betas=(0.5, 0.9))
+                                                  lr=instrument_learning_rate, betas=(0.5, 0.9))
+
         self.device = device
         self._num_steps = 0
 
@@ -91,7 +91,7 @@ class F2BMLDLearner:
         target = target - self.discount * (1 - dones_1st[:, None]) * self.treatment_net(next_obs_1st, next_action_1st).detach()
 
         loss_1 = ((target - self.instrument_tilde_net(current_obs_1st, action_1st)) ** 2).mean()
-        loss_2 = ((reward_2nd - self.instrument_tilde_net(current_obs_2nd, action_2nd)) ** 2).mean()
+        loss_2 = ((reward_2nd[:, None] - self.instrument_tilde_net(current_obs_2nd, action_2nd)) ** 2).mean()
         loss = self.lagrange_reg * loss_1 + loss_2
         loss += self.lagrange_reg * self.stage1_reg * sum(p.pow(2).sum() for p in self.instrument_tilde_net.parameters())
 
@@ -124,16 +124,22 @@ class F2BMLDLearner:
         stage1_loss = None
         stage2_loss = None
         for _ in range(self.treatment_iter):
-            for _ in range(10):
+            for _ in range(self.instrument_iter):
                 stage1_loss = self.update_instrument(stage1_input)
                 # print(f"Stage 1 Instrument Loss: {stage1_loss:.4f}")
-            for _ in range(100):
+            for _ in range(self.instrument_tilde_iter):
                 stage1_tilde_loss = self.update_instrument_tilde(stage1_input, stage2_input)
                 # print(f"Stage 1 Instrument Tilde Loss: {stage1_tilde_loss:.4f}")
+            stage1_input, stage2_input = self.update_batch()
             stage2_loss = self.update_treatment(stage1_input, stage2_input)
 
         self._num_steps += 1
 
+        # if self._num_steps % 100 == 0:
+        #     for _ in range(self.instrument_iter):
+        #         stage1_loss = self.update_instrument(stage1_input)
+        #         print(f"Stage 1 Instrument Loss: {stage1_loss:.4f}")
+        #     pause = True
         result = {"stage1_loss": stage1_loss, "stage1_tilde_loss": stage1_tilde_loss, "stage2_loss": stage2_loss, "num_steps": self._num_steps}
         return result
     
