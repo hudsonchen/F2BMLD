@@ -1,3 +1,5 @@
 /bsuite/
 /bsuite_near_policy/
 /results/
+/datasets/
+policy_net.pth

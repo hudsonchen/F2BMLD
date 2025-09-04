@@ -39,7 +39,7 @@ class DFIVLearner:
         self,
         value_func: nn.Module,
         instrumental_feature: nn.Module,
-        policy_net: nn.Module,
+        policy: nn.Module,
         discount: float,
         value_learning_rate: float,
         instrumental_learning_rate: float,
@@ -67,7 +67,7 @@ class DFIVLearner:
         self.value_func = value_func
         self.value_feature = value_func._feature
         self.instrumental_feature = instrumental_feature
-        self.policy = policy_net
+        self.policy = policy
 
         self._value_optimizer = optim.Adam(self.value_feature.parameters(),
                                            lr=value_learning_rate, betas=(0.5, 0.9))

@@ -2,15 +2,15 @@ import numpy as np
 import torch
 
 
-def cal_mse(value_func, policy_net, environment, mse_samples, discount, device="cpu"):
-    """Compute Bellman residual MSE under the policy_net in PyTorch."""
+def cal_mse(value_func, policy, environment, mse_samples, discount, device="cpu"):
+    """Compute Bellman residual MSE under the policy in PyTorch."""
     sample_count = 0
     obs, _ = environment.reset()
     mse = 0.0
 
     while sample_count < mse_samples:
         obs_tensor = torch.tensor(obs, dtype=torch.float32, device=device).unsqueeze(0)
-        action = policy_net(obs_tensor)             # (batch, action_dim) or discrete action
+        action = policy(obs_tensor)             # (batch, action_dim) or discrete action
         if isinstance(action, torch.Tensor):
             action_np = action.squeeze(0).detach().cpu().numpy()
         else:
@@ -30,7 +30,7 @@ def cal_mse(value_func, policy_net, environment, mse_samples, discount, device="
             # restart episode
             obs, _ = environment.reset()
         else:
-            next_action = policy_net(next_obs_tensor)
+            next_action = policy(next_obs_tensor)
             target = reward + discount * value_func(next_obs_tensor, next_action).detach()
             q_val = value_func(obs_tensor, action_tensor)
             mse_one = (target - q_val) ** 2
@@ -42,27 +42,23 @@ def cal_mse(value_func, policy_net, environment, mse_samples, discount, device="
     return mse / mse_samples
 
 
-def ope_evaluation(value_func, policy_net, environment, num_init_samples,
+def ope_evaluation(value_func, policy, environment, num_init_samples,
                    mse_samples=0, discount=0.99, counter=None, logger=None, device="cpu"):
     """Run OPE evaluation in PyTorch."""
     mse = -1
     if mse_samples > 0:
-        mse = cal_mse(value_func, policy_net, environment, mse_samples, discount, device=device)
+        mse = cal_mse(value_func, policy, environment, mse_samples, discount, device=device)
 
     # Estimate initial Q-values from the starting state distribution
     q0s = []
     for _ in range(num_init_samples):
         obs, _ = environment.reset()
         obs_tensor = torch.tensor(obs, dtype=torch.float32, device=device).unsqueeze(0)
-        action = policy_net(obs_tensor)
+        action = policy(obs_tensor)
         q0 = value_func(obs_tensor, action).item()
         q0s.append(q0)
 
     q0s = np.array(q0s)
-
-    # Q0_mean_truth, Q0_mean_truth_str = estimate_true_value(
-    #         policy_net, environment, discount
-    #     )
     
     results = {
         "Bellman_Residual_MSE": mse,
@@ -80,16 +76,16 @@ def ope_evaluation(value_func, policy_net, environment, num_init_samples,
     return results
 
 
-def estimate_true_value(policy_net, environment, discount=0.99, 
-                        rollout_episodes=100, device="cpu"):
+def estimate_true_value(policy, environment, discount=0.99, 
+                        num_episodes=100, device="cpu"):
     """
     Estimate the true discounted return of a policy by Monte Carlo rollouts.
 
     Args:
-        policy_net: Callable/nn.Module mapping obs -> action (PyTorch).
+        policy: Callable/nn.Module mapping obs -> action (PyTorch).
         environment: Gym-like env with reset() and step().
         discount: float, discount factor.
-        rollout_episodes: int, number of episodes to average over.
+        num_episodes: int, number of episodes to average over.
         device: str, "cpu" or "cuda".
 
     Returns:
@@ -97,13 +93,13 @@ def estimate_true_value(policy_net, environment, discount=0.99,
         stderr_return: standard error of returns.
     """
     returns = []
-    for _ in range(rollout_episodes):
+    for _ in range(num_episodes):
         obs, _ = environment.reset()
         done, ep_return, t = False, 0.0, 0
 
         while not done:
             obs_tensor = torch.tensor(obs, dtype=torch.float32, device=device).unsqueeze(0)
-            action = policy_net(obs_tensor)
+            action = policy(obs_tensor)
 
             # handle discrete vs continuous
             if isinstance(action, torch.Tensor):
@@ -121,5 +117,4 @@ def estimate_true_value(policy_net, environment, discount=0.99,
         returns.append(ep_return)
 
     mean_return = float(np.mean(returns))
-    stderr_return = float(np.std(returns, ddof=0) / np.sqrt(len(returns)))
-    return mean_return, stderr_return
+    return mean_return

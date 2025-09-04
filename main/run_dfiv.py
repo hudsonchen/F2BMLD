@@ -8,7 +8,7 @@ import utils
 from utils.logger import StandardLogger
 from methods import dfiv
 import numpy as np
-
+from functools import partial
 from dataclasses import dataclass
 
 @dataclass
@@ -30,9 +30,10 @@ class Config:
     evaluate_init_samples: int = 1000
     max_steps: int = 100_000
     noise_level: float = 0.1
+    policy_noise_level: float = 0.0
     
 config = Config(dataset_path=str(ROOT_PATH / "offline_dataset" / "stochastic"))
-
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # def target_policy(obs_batch, act_dim: int = 2):
 #     """
@@ -53,36 +54,56 @@ config = Config(dataset_path=str(ROOT_PATH / "offline_dataset" / "stochastic"))
 #     else:
 #         raise TypeError("Input must be a numpy array or torch tensor")
     
-def target_policy(obs_batch: torch.Tensor) -> torch.Tensor:
+# def target_policy(obs_batch: torch.Tensor) -> torch.Tensor:
+#     """
+#     Heuristic policy for CartPole.
+#     obs = [cart_position, cart_velocity, pole_angle, pole_angular_velocity]
+#     """
+#     if isinstance(obs_batch, np.ndarray):
+#         if obs_batch.ndim == 1:
+#             angle = obs_batch[2]  # pole angle
+#         else:
+#             angle = obs_batch[:, 2] 
+#         return (angle > 0).astype(np.int64)
+#     elif isinstance(obs_batch, torch.Tensor):
+#         if obs_batch.ndim == 1:
+#             angle = obs_batch[2]  # pole angle
+#         else:
+#             angle = obs_batch[:, 2]  # pole angle
+#         action = (angle > 0).long()  # 0 = left, 1 = right
+#         return action
+
+def target_policy(obs_batch: torch.Tensor, policy_dqn: torch.nn.Module) -> torch.Tensor:
+    with torch.no_grad():
+        return policy_dqn(obs_batch).argmax(dim=-1)
+
+
+def behavior_policy(obs_batch: torch.Tensor, policy_dqn: torch.nn.Module, epsilon=0.2) -> torch.Tensor:
     """
-    Heuristic policy for CartPole.
-    obs = [cart_position, cart_velocity, pole_angle, pole_angular_velocity]
+    Policy that follows the trained DQN policy but with probability epsilon takes a random action.
     """
-    if isinstance(obs_batch, np.ndarray):
-        if obs_batch.ndim == 1:
-            angle = obs_batch[2]  # pole angle
-        else:
-            angle = obs_batch[:, 2] 
-        return (angle > 0).astype(np.int64)
-    elif isinstance(obs_batch, torch.Tensor):
-        if obs_batch.ndim == 1:
-            angle = obs_batch[2]  # pole angle
-        else:
-            angle = obs_batch[:, 2]  # pole angle
-        action = (angle > 0).long()  # 0 = left, 1 = right
-        return action
+    with torch.no_grad():
+        greedy_actions = policy_dqn(obs_batch).argmax(dim=-1)  # [batch]
+    
+    random_mask = torch.rand(len(obs_batch)) < epsilon
+    random_actions = torch.randint(0, 2, size=(len(obs_batch),), dtype=torch.long).to(obs_batch.device)
+    final_actions = greedy_actions.clone()
+    final_actions[random_mask] = random_actions[random_mask]
+    return final_actions
+
 
 def main():
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # Load pretrained DQN network
+    policy_dqn = utils.load_pretrained_dqn("policy_net.pth", device=device)
 
     # Load the offline dataset and environment.
     dataset_loader, dev_loader, env, env_spec = utils.load_data_and_env(
         task_name="CartPole-v1",
         noise_level=config.noise_level,
-        near_policy_dataset=True,
-        policy=target_policy,
+        policy=partial(behavior_policy, policy_dqn=policy_dqn, epsilon=config.policy_noise_level),
         batch_size=config.batch_size,
         max_dev_size=config.max_dev_size,
+        device=device
     )
 
     value_func, instrumental_feature = dfiv.make_ope_networks(
@@ -99,7 +120,7 @@ def main():
     learner = dfiv.DFIVLearner(
         value_func=value_func,
         instrumental_feature=instrumental_feature,
-        policy_net=target_policy,
+        policy=partial(target_policy, policy_dqn=policy_dqn),
         discount=0.99,
         value_learning_rate=config.value_learning_rate,
         instrumental_learning_rate=config.instrumental_learning_rate,
@@ -116,6 +137,11 @@ def main():
     
     eval_logger = StandardLogger(name='val', log_dir='./results/dfiv')
 
+    truth_value = utils.estimate_true_value(
+        partial(target_policy, policy_dqn=policy_dqn), env, discount=0.99, num_episodes=100, device=device
+    )
+    print(f"Ground-truth policy value: {truth_value}")
+
     while True:
         learner.step()
         steps = learner._num_steps
@@ -126,7 +152,7 @@ def main():
                 eval_results = {'dev_mse': learner.cal_validation_err(dev_loader)}
             eval_results.update(utils.ope_evaluation(
                 value_func=value_func,
-                policy_net=target_policy,
+                policy=partial(target_policy, policy_dqn=policy_dqn),
                 environment=env,
                 num_init_samples=config.evaluate_init_samples,
                 discount=0.99,

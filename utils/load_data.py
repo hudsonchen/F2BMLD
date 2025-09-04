@@ -3,7 +3,9 @@ import numpy as np
 import torch
 from torch.utils.data import TensorDataset, DataLoader
 from typing import Tuple, Dict, Mapping
-
+from tqdm import tqdm
+import pickle
+import os
 
 class RandomActionWrapper(gym.Wrapper):
     """With probability `eps`, take a random action instead of the policy's action."""
@@ -35,15 +37,16 @@ def make_environment(env_name: str, noise_level: float = 0.0):
     return env, environment_spec
 
 
-def collect_offline_dataset(env, num_episodes, policy):
+def collect_offline_dataset(env, num_episodes, policy, device):
     """Collect offline dataset from the environment using a behavior policy."""
     dataset = []
 
-    for _ in range(num_episodes):
+    for _ in tqdm(range(num_episodes)):
         obs, _ = env.reset()
         done = False
         while not done:
-            action = policy(obs)
+            obs_tensor = torch.tensor(obs, dtype=torch.float32, device=device).unsqueeze(0)
+            action = policy(obs_tensor).cpu().numpy().squeeze(0).item()
             next_obs, reward, terminated, truncated, _ = env.step(action)
             done = terminated or truncated
             dataset.append((obs, action, reward, done, next_obs))
@@ -55,10 +58,10 @@ def collect_offline_dataset(env, num_episodes, policy):
 def load_data_and_env(
     task_name: str,
     noise_level: float = 0.0,
-    near_policy_dataset: bool = False,
     policy: Mapping = None,
     batch_size: int = 128,
     max_dev_size: int = 1000,
+    device: str = "cpu"
 ) -> Tuple[DataLoader, DataLoader, gym.Env, Dict]:
     """
     Returns: dataset_loader, dev_dataset_loader, environment, environment_spec
@@ -67,7 +70,14 @@ def load_data_and_env(
     env, env_spec = make_environment(task_name, noise_level)
 
     # 2. Collect dataset
-    dataset = collect_offline_dataset(env, num_episodes=2000, policy=policy)
+    if os.path.exists("datasets/dqn_gererated_dataset.pkl"):
+        with open("datasets/dqn_gererated_dataset.pkl", "rb") as f:
+            dataset = pickle.load(f)
+    else:
+        dataset = collect_offline_dataset(env, num_episodes=2000, policy=policy, device=device)
+        os.makedirs(os.path.dirname('datasets/dqn_gererated_dataset.pkl'), exist_ok=True)  # make sure folder exists
+        with open("datasets/dqn_gererated_dataset.pkl", "wb") as f:
+            pickle.dump(dataset, f)
 
     # 3. Convert to tensors
     states = torch.tensor([d[0] for d in dataset], dtype=torch.float32)
