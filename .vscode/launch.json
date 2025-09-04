@@ -13,6 +13,17 @@
         // "args": ["--eps", "0.1"],
     },
         {
+        "name": "Python: F2BMLD",
+        "type": "python",
+        "request": "launch",
+        "program": "${workspaceRoot}/main/run_f2bmld.py",
+        "console": "integratedTerminal",
+        "cwd": "${workspaceFolder}",
+        "justMyCode": true,
+        "python": "/home/zongchen/miniconda3/envs/F2BMLD/bin/python",
+        // "args": ["--eps", "0.1"],
+    },
+        {
         "name": "Python: toy",
         "type": "python",
         "request": "launch",

@@ -127,7 +127,7 @@ class DFIVLearner:
 
         target_1st = add_const_col(self.value_feature(current_obs_1st, action_1st))
         target_1st = target_1st - self.discount * (1 - dones_1st[:, None]) * add_const_col(
-            self.value_feature(next_obs_1st, next_action_1st) * (1 - dones_1st[:, None])
+            self.value_feature(next_obs_1st, next_action_1st)
         )
     
         stage1_weight = fit_linear(target_1st, instrumental_feature_1st, self.stage1_reg)

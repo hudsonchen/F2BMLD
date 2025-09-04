@@ -6,7 +6,7 @@ sys.path.append(str(ROOT_PATH))
 import torch
 import utils
 from utils.logger import StandardLogger
-from methods import dfiv
+from methods import f2bmld
 import numpy as np
 from functools import partial
 from dataclasses import dataclass
@@ -16,19 +16,20 @@ import matplotlib.pyplot as plt
 @dataclass
 class Config:
     dataset_path: str
-    value_layer_sizes: str = "50,50"
-    instrumental_layer_sizes: str = "50,50"
+    treatment_layer_sizes: str = "50, 50, 1"
+    instrument_layer_sizes: str = "50, 50, 1"
     batch_size: int = 1024
-    value_learning_rate: float = 1e-4
-    instrumental_learning_rate: float = 1e-3
+    treatment_learning_rate: float = 1e-3
+    instrument_learning_rate: float = 1e-3
     stage1_reg: float = 1e-5
     stage2_reg: float = 1e-5
-    instrumental_reg: float = 1e-5
-    value_reg: float = 1e-5
-    instrumental_iter: int = 1
-    value_iter: int = 1
+    instrument_reg: float = 1e-5
+    treatment_reg: float = 1e-5
+    lagrange_reg: float=1.0
+    instrument_iter: int = 100
+    treatment_iter: int = 1
     max_dev_size: int = 10 * 1024
-    evaluate_every: int = 1000
+    evaluate_every: int = 100
     evaluate_init_samples: int = 1000
     max_steps: int = 100_000
     noise_level: float = 0.1
@@ -36,44 +37,6 @@ class Config:
     
 config = Config(dataset_path=str(ROOT_PATH / "offline_dataset" / "stochastic"))
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-# def target_policy(obs_batch, act_dim: int = 2):
-#     """
-#     Random policy for CartPole (discrete actions 0 or 1).
-#     obs_batch: torch.Tensor or np.ndarray, shape [batch, 4] or [4]
-#     Returns: actions of shape [batch] (int64)
-#     """
-#     if isinstance(obs_batch, np.ndarray):
-#         if obs_batch.ndim == 1:
-#             return np.random.randint(act_dim)
-#         else:
-#             return np.random.randint(act_dim, size=obs_batch.shape[0])
-#     elif isinstance(obs_batch, torch.Tensor):
-#         if obs_batch.ndim == 1:
-#             return torch.randint(0, act_dim, (1,)).item()
-#         else:
-#             return torch.randint(0, act_dim, (obs_batch.shape[0],))
-#     else:
-#         raise TypeError("Input must be a numpy array or torch tensor")
-    
-# def target_policy(obs_batch: torch.Tensor) -> torch.Tensor:
-#     """
-#     Heuristic policy for CartPole.
-#     obs = [cart_position, cart_velocity, pole_angle, pole_angular_velocity]
-#     """
-#     if isinstance(obs_batch, np.ndarray):
-#         if obs_batch.ndim == 1:
-#             angle = obs_batch[2]  # pole angle
-#         else:
-#             angle = obs_batch[:, 2] 
-#         return (angle > 0).astype(np.int64)
-#     elif isinstance(obs_batch, torch.Tensor):
-#         if obs_batch.ndim == 1:
-#             angle = obs_batch[2]  # pole angle
-#         else:
-#             angle = obs_batch[:, 2]  # pole angle
-#         action = (angle > 0).long()  # 0 = left, 1 = right
-#         return action
 
 def target_policy(obs_batch: torch.Tensor, policy_dqn: torch.nn.Module) -> torch.Tensor:
     with torch.no_grad():
@@ -95,58 +58,60 @@ def behavior_policy(obs_batch: torch.Tensor, policy_dqn: torch.nn.Module, epsilo
 
 
 def main():
-    # Load pretrained DQN network
     policy_dqn = utils.load_pretrained_dqn("policy_net.pth", device=device)
 
-    # Load the offline dataset and environment.
     dataset_loader, dev_loader, env, env_spec = utils.load_data_and_env(
         task_name="CartPole-v1",
         noise_level=config.noise_level,
-        policy=partial(behavior_policy, policy_dqn=policy_dqn, epsilon=config.policy_noise_level),
+        policy=partial(behavior_policy, policy_dqn=policy_dqn, 
+                       epsilon=config.policy_noise_level),
         batch_size=config.batch_size,
         max_dev_size=config.max_dev_size,
         device=device
     )
 
-    value_func, instrumental_feature = dfiv.make_ope_networks(
+    treatment_net, instrument_net, instrument_tilde_net = f2bmld.make_ope_networks(
         "bsuite_cartpole",
         env_spec,
-        value_layer_sizes=config.value_layer_sizes,
-        instrumental_layer_sizes=config.instrumental_layer_sizes,
+        treatment_layer_sizes=config.treatment_layer_sizes,
+        instrument_layer_sizes=config.instrument_layer_sizes,
         device=device
     )
 
     counter = Counter()
-    log_dir=f'./results/dfiv_env_noise_{config.noise_level}__policy_noise_{config.policy_noise_level}'
+    log_dir=f'./results/f2bmld_env_noise_{config.noise_level}__policy_noise_{config.policy_noise_level}'
     logger = StandardLogger(name='train', log_dir=log_dir)
     eval_logger = StandardLogger(name='val', log_dir=log_dir)
 
-    learner = dfiv.DFIVLearner(
-        value_func=value_func,
-        instrumental_feature=instrumental_feature,
+    learner = f2bmld.F2BMLDLearner(
+        treatment_net=treatment_net,
+        instrument_net=instrument_net,
+        instrument_tilde_net=instrument_tilde_net,
         policy=partial(target_policy, policy_dqn=policy_dqn),
         discount=0.99,
-        value_learning_rate=config.value_learning_rate,
-        instrumental_learning_rate=config.instrumental_learning_rate,
+        treatment_learning_rate=config.treatment_learning_rate,
+        instrument_learning_rate=config.instrument_learning_rate,
         stage1_reg=config.stage1_reg,
         stage2_reg=config.stage2_reg,
-        value_reg=config.value_reg,
-        instrumental_reg=config.instrumental_reg,
-        instrumental_iter=config.instrumental_iter,
-        value_iter=config.value_iter,
+        lagrange_reg=config.lagrange_reg,
+        instrument_iter=config.instrument_iter,
+        treatment_iter=config.treatment_iter,
         dataset=dataset_loader,
         device=device,
         counter=counter,
         logger=logger)
     
     truth_value = utils.estimate_true_value(
-        partial(target_policy, policy_dqn=policy_dqn), env, discount=0.99, num_episodes=1000, device=device
+        partial(target_policy, policy_dqn=policy_dqn), env, discount=0.99, num_episodes=100, device=device
     )
-    print(f"Ground-truth policy value: {truth_value}")
+    print(f"Ground-truth policy treatment: {truth_value}")
 
     # Keep history outside loop
     train_logs = []
     eval_logs = []
+
+
+    ### Plotting code ###
 
     plt.ion()  # interactive mode
     fig, axes = plt.subplots(2, 2, figsize=(10, 6))
@@ -165,6 +130,8 @@ def main():
     axes[3].axhline(y=truth_value, color='g', linestyle='--', label='True value')
     axes[3].set_title("Q0 Mean ± StdErr"); axes[3].set_xlabel("Steps"); axes[3].set_ylabel("Q0"); axes[3].legend()
 
+    fig.tight_layout()
+
     while True:
         # --- Training step ---
         train_results = learner.step()
@@ -179,7 +146,7 @@ def main():
             if dev_loader is not None:
                 eval_results["dev_mse"] = learner.cal_validation_err(dev_loader)
             eval_results.update(utils.ope_evaluation(
-                value_func=value_func,
+                treatment_net,
                 policy=partial(target_policy, policy_dqn=policy_dqn),
                 environment=env,
                 num_init_samples=config.evaluate_init_samples,
@@ -215,10 +182,12 @@ def main():
             fig.tight_layout()
             fig.savefig(f"{log_dir}/training_progress.png")
 
+
         # --- Exit condition ---
         if steps >= config.max_steps:
-            torch.save(value_func.state_dict(), f"{log_dir}/value_func.pth")
-            torch.save(instrumental_feature.state_dict(), f"{log_dir}/instrumental_feature.pth")
+            torch.save(treatment_net.state_dict(), f"{log_dir}/treatment_net.pth")
+            torch.save(instrument_net.state_dict(), f"{log_dir}/instrument_net.pth")
+            torch.save(instrument_tilde_net.state_dict(), f"{log_dir}/instrument_tilde_net.pth")
             break
 
 if __name__ == "__main__":

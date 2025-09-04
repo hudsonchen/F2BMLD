@@ -49,7 +49,6 @@ def ope_evaluation(value_func, policy, environment, num_init_samples,
     if mse_samples > 0:
         mse = cal_mse(value_func, policy, environment, mse_samples, discount, device=device)
 
-    # Estimate initial Q-values from the starting state distribution
     q0s = []
     for _ in range(num_init_samples):
         obs, _ = environment.reset()
