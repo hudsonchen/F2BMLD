@@ -10,6 +10,8 @@ from methods import dfiv
 import numpy as np
 from functools import partial
 from dataclasses import dataclass
+import pandas as pd
+import matplotlib.pyplot as plt
 
 @dataclass
 class Config:
@@ -115,7 +117,9 @@ def main():
     )
 
     counter = Counter()
-    logger = StandardLogger(name='train', log_dir='./results/dfiv')
+    log_dir=f'./results/dfiv_env_noise_{config.noise_level}__policy_noise_{config.policy_noise_level}'
+    logger = StandardLogger(name='train', log_dir=log_dir)
+    eval_logger = StandardLogger(name='val', log_dir=log_dir)
 
     learner = dfiv.DFIVLearner(
         value_func=value_func,
@@ -135,21 +139,28 @@ def main():
         counter=counter,
         logger=logger)
     
-    eval_logger = StandardLogger(name='val', log_dir='./results/dfiv')
-
     truth_value = utils.estimate_true_value(
-        partial(target_policy, policy_dqn=policy_dqn), env, discount=0.99, num_episodes=100, device=device
+        partial(target_policy, policy_dqn=policy_dqn), env, discount=0.99, num_episodes=1000, device=device
     )
     print(f"Ground-truth policy value: {truth_value}")
 
+    # Keep history outside loop
+    train_logs = []
+    eval_logs = []
+
     while True:
-        learner.step()
+        # --- Training step ---
+        train_results = learner.step()
+        train_results["num_steps"] = learner._num_steps  # make sure steps are logged
+        train_logs.append(train_results)
+
         steps = learner._num_steps
 
+        # --- Evaluation ---
         if steps % config.evaluate_every == 0:
             eval_results = {}
             if dev_loader is not None:
-                eval_results = {'dev_mse': learner.cal_validation_err(dev_loader)}
+                eval_results["dev_mse"] = learner.cal_validation_err(dev_loader)
             eval_results.update(utils.ope_evaluation(
                 value_func=value_func,
                 policy=partial(target_policy, policy_dqn=policy_dqn),
@@ -158,13 +169,61 @@ def main():
                 discount=0.99,
                 mse_samples=100,
                 device=device,
-                )
-            )
-            eval_logger.write(eval_results)
+            ))
+            eval_results["num_steps"] = steps  # log step for x-axis
+            eval_logs.append(eval_results)
 
+            # --- Convert to DataFrame ---
+            train_df = pd.DataFrame(train_logs)
+            eval_df = pd.DataFrame(eval_logs)
+
+            # Compute moving averages for losses
+            train_df["stage1_loss_ma"] = train_df["stage1_loss"].rolling(window=100).mean()
+            train_df["stage2_loss_ma"] = train_df["stage2_loss"].rolling(window=100).mean()
+
+            fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+            axes = axes.flatten()  # easy indexing
+
+            # --- Stage 1 Loss (smoothed) ---
+            axes[0].plot(train_df["num_steps"], train_df["stage1_loss_ma"], label="Stage 1 Loss (MA100)")
+            axes[0].set_xlabel("Steps")
+            axes[0].set_ylabel("Loss")
+            axes[0].set_title("Stage 1 Loss")
+            axes[0].legend()
+
+            # --- Stage 2 Loss (smoothed) ---
+            axes[1].plot(train_df["num_steps"], train_df["stage2_loss_ma"], label="Stage 2 Loss (MA100)", color="orange")
+            axes[1].set_xlabel("Steps")
+            axes[1].set_ylabel("Loss")
+            axes[1].set_title("Stage 2 Loss")
+            axes[1].legend()
+
+            # --- Bellman Residual MSE ---
+            if "Bellman_Residual_MSE" in eval_df:
+                axes[2].plot(eval_df["num_steps"], eval_df["Bellman_Residual_MSE"], "r--", label="Bellman Residual MSE")
+            axes[2].set_xlabel("Steps")
+            axes[2].set_ylabel("MSE")
+            axes[2].set_title("Bellman Residual MSE")
+            axes[2].legend()
+
+            # --- Q0 Mean ± SE ---
+            if "Q0_mean" in eval_df and "Q0_std_err" in eval_df:
+                axes[3].errorbar(eval_df["num_steps"], eval_df["Q0_mean"], 
+                                yerr=eval_df["Q0_std_err"], fmt="bo-", label="Q0 Mean ± SE")
+            axes[3].set_xlabel("Steps")
+            axes[3].set_ylabel("Q0")
+            axes[3].set_title("Q0 Mean ± StdErr")
+            axes[3].axhline(y=truth_value, color='g', linestyle='--', label='True Value')
+            axes[3].legend()
+
+            plt.tight_layout()
+            plt.savefig(f"{log_dir}/training_progress_{steps}.png")
+            plt.close(fig)
+        # --- Exit condition ---
         if steps >= config.max_steps:
+            torch.save(value_func.state_dict(), f"{log_dir}/value_func.pth")
+            torch.save(instrumental_feature.state_dict(), f"{log_dir}/instrumental_feature.pth")
             break
-
 
 if __name__ == "__main__":
     main()
