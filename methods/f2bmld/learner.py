@@ -3,6 +3,15 @@ import torch.nn as nn
 import torch.optim as optim
 
 
+def add_langevin_noise(params, noise_level):
+    """
+    Add Langevin dynamics noise to network parameters.
+    """
+    with torch.no_grad():
+        for p in params:
+            if p.requires_grad:
+                p.add_(torch.randn_like(p) * noise_level)
+
 class F2BMLDLearner:
     def __init__(
         self,
@@ -16,6 +25,8 @@ class F2BMLDLearner:
         stage1_reg: float,
         stage2_reg: float,
         lagrange_reg: float,
+        stage1_ent: float,
+        stage2_ent: float,
         instrument_iter: int,
         instrument_tilde_iter: int,
         treatment_iter: int,
@@ -30,6 +41,8 @@ class F2BMLDLearner:
         self.instrument_iter = instrument_iter
         self.instrument_tilde_iter = instrument_tilde_iter
         self.treatment_iter = treatment_iter
+        self.stage1_ent = stage1_ent
+        self.stage2_ent = stage2_ent
         self.discount = discount
         self.treatment_net = treatment_net
         self.instrument_net = instrument_net
@@ -81,6 +94,7 @@ class F2BMLDLearner:
         self._instrument_optimizer.zero_grad()
         loss.backward()
         self._instrument_optimizer.step()
+        add_langevin_noise(self.instrument_net.parameters(), self.stage1_ent)
         return loss.item()
 
     def update_instrument_tilde(self, stage1_input, stage2_input):
@@ -98,6 +112,7 @@ class F2BMLDLearner:
         self._instrument_tilde_optimizer.zero_grad()
         loss.backward()
         self._instrument_tilde_optimizer.step()
+        add_langevin_noise(self.instrument_tilde_net.parameters(), self.stage1_ent * self.lagrange_reg)
         return loss.item()
     
 
@@ -117,6 +132,7 @@ class F2BMLDLearner:
         self._treatment_optimizer.zero_grad()
         loss.backward()
         self._treatment_optimizer.step()
+        add_langevin_noise(self.treatment_net.parameters(), self.stage2_ent)
         return loss.item()
 
     def step(self):
@@ -135,11 +151,6 @@ class F2BMLDLearner:
 
         self._num_steps += 1
 
-        # if self._num_steps % 100 == 0:
-        #     for _ in range(self.instrument_iter):
-        #         stage1_loss = self.update_instrument(stage1_input)
-        #         print(f"Stage 1 Instrument Loss: {stage1_loss:.4f}")
-        #     pause = True
         result = {"stage1_loss": stage1_loss, "stage1_tilde_loss": stage1_tilde_loss, "stage2_loss": stage2_loss, "num_steps": self._num_steps}
         return result
     

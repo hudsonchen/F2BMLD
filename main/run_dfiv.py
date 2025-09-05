@@ -1,3 +1,5 @@
+import os
+os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 from collections import Counter
 import pathlib
 import sys
@@ -12,68 +14,9 @@ from functools import partial
 from dataclasses import dataclass
 import pandas as pd
 import matplotlib.pyplot as plt
-
-@dataclass
-class Config:
-    dataset_path: str
-    value_layer_sizes: str = "50"
-    instrumental_layer_sizes: str = "50"
-    batch_size: int = 1024
-    value_learning_rate: float = 1e-4
-    instrumental_learning_rate: float = 1e-3
-    stage1_reg: float = 1e-5
-    stage2_reg: float = 1e-5
-    instrumental_reg: float = 1e-5
-    value_reg: float = 1e-5
-    instrumental_iter: int = 1
-    value_iter: int = 1
-    max_dev_size: int = 10 * 1024
-    evaluate_every: int = 100
-    evaluate_init_samples: int = 1000
-    max_steps: int = 100_000
-    noise_level: float = 0.1
-    policy_noise_level: float = 0.0
-    
-config = Config(dataset_path=str(ROOT_PATH / "offline_dataset" / "stochastic"))
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-# def target_policy(obs_batch, act_dim: int = 2):
-#     """
-#     Random policy for CartPole (discrete actions 0 or 1).
-#     obs_batch: torch.Tensor or np.ndarray, shape [batch, 4] or [4]
-#     Returns: actions of shape [batch] (int64)
-#     """
-#     if isinstance(obs_batch, np.ndarray):
-#         if obs_batch.ndim == 1:
-#             return np.random.randint(act_dim)
-#         else:
-#             return np.random.randint(act_dim, size=obs_batch.shape[0])
-#     elif isinstance(obs_batch, torch.Tensor):
-#         if obs_batch.ndim == 1:
-#             return torch.randint(0, act_dim, (1,)).item()
-#         else:
-#             return torch.randint(0, act_dim, (obs_batch.shape[0],))
-#     else:
-#         raise TypeError("Input must be a numpy array or torch tensor")
-    
-# def target_policy(obs_batch: torch.Tensor) -> torch.Tensor:
-#     """
-#     Heuristic policy for CartPole.
-#     obs = [cart_position, cart_velocity, pole_angle, pole_angular_velocity]
-#     """
-#     if isinstance(obs_batch, np.ndarray):
-#         if obs_batch.ndim == 1:
-#             angle = obs_batch[2]  # pole angle
-#         else:
-#             angle = obs_batch[:, 2] 
-#         return (angle > 0).astype(np.int64)
-#     elif isinstance(obs_batch, torch.Tensor):
-#         if obs_batch.ndim == 1:
-#             angle = obs_batch[2]  # pole angle
-#         else:
-#             angle = obs_batch[:, 2]  # pole angle
-#         action = (angle > 0).long()  # 0 = left, 1 = right
-#         return action
+import argparse
+import random
+ 
 
 def target_policy(obs_batch: torch.Tensor, policy_dqn: torch.nn.Module) -> torch.Tensor:
     with torch.no_grad():
@@ -94,7 +37,7 @@ def behavior_policy(obs_batch: torch.Tensor, policy_dqn: torch.nn.Module, epsilo
     return final_actions
 
 
-def main():
+def main(config):
     # Load pretrained DQN network
     policy_dqn = utils.load_pretrained_dqn("policy_net.pth", device=device)
 
@@ -118,6 +61,7 @@ def main():
 
     counter = Counter()
     log_dir=f'./results/dfiv_env_noise_{config.noise_level}__policy_noise_{config.policy_noise_level}'
+    log_dir += f'_seed_{config.seed}'
     logger = StandardLogger(name='train', log_dir=log_dir)
     eval_logger = StandardLogger(name='val', log_dir=log_dir)
 
@@ -222,4 +166,38 @@ def main():
             break
 
 if __name__ == "__main__":
-    main()
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--value_layer_sizes", type=str, default="50")
+    parser.add_argument("--instrumental_layer_sizes", type=str, default="50")
+    parser.add_argument("--batch_size", type=int, default=1024)
+    parser.add_argument("--value_learning_rate", type=float, default=1e-4)
+    parser.add_argument("--instrumental_learning_rate", type=float, default=1e-3)
+    parser.add_argument("--stage1_reg", type=float, default=1e-5)
+    parser.add_argument("--stage2_reg", type=float, default=1e-5)
+    parser.add_argument("--instrumental_reg", type=float, default=1e-5)
+    parser.add_argument("--value_reg", type=float, default=1e-5)
+    parser.add_argument("--instrumental_iter", type=int, default=1)
+    parser.add_argument("--value_iter", type=int, default=1)
+    parser.add_argument("--max_dev_size", type=int, default=10 * 1024)
+    parser.add_argument("--evaluate_every", type=int, default=100)
+    parser.add_argument("--evaluate_init_samples", type=int, default=1000)
+    parser.add_argument("--max_steps", type=int, default=10000)
+    parser.add_argument("--noise_level", type=float, default=0.1)
+    parser.add_argument("--policy_noise_level", type=float, default=0.0)
+    parser.add_argument("--seed", type=int, default=0)
+
+    config = parser.parse_args()
+    global device
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    random.seed(config.seed)
+    np.random.seed(config.seed)
+    torch.manual_seed(config.seed)
+    torch.cuda.manual_seed(config.seed)
+    torch.cuda.manual_seed_all(config.seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    torch.use_deterministic_algorithms(True, warn_only=True)
+
+    main(config)

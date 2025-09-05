@@ -1,5 +1,4 @@
 from typing import Dict, Any, Tuple
-
 import torch.nn as nn
 
 from .bsuite_network import make_network_bsuite

@@ -1,9 +1,12 @@
+import os
+os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 from collections import Counter
 import pathlib
 import sys
 ROOT_PATH = pathlib.Path(__file__).resolve().parent.parent
 sys.path.append(str(ROOT_PATH))
 import torch
+import random
 import utils
 from utils.logger import StandardLogger
 from methods import f2bmld
@@ -15,17 +18,6 @@ import matplotlib.pyplot as plt
 import argparse
 import json
 
-seed = 0
-# PyTorch
-torch.manual_seed(seed)
-torch.cuda.manual_seed(seed)           # for a single GPU
-torch.cuda.manual_seed_all(seed)       # for all GPUs
-
-# Ensures deterministic behavior (may reduce performance)
-torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.benchmark = False
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def target_policy(obs_batch: torch.Tensor, policy_dqn: torch.nn.Module) -> torch.Tensor:
     with torch.no_grad():
@@ -72,7 +64,7 @@ def main(config):
     log_dir += f'__lagrange_{config.lagrange_reg}__stage1_reg_{config.stage1_reg}__stage2_reg_{config.stage2_reg}'
     log_dir += f'__treat_lr_{config.treatment_learning_rate}__instr_lr_{config.instrument_learning_rate}'
     log_dir += f'__instr_iter_{config.instrument_iter}__instr_tilde_iter_{config.instrument_tilde_iter}'
-    log_dir += f'__bs_{config.batch_size}'
+    log_dir += f'__bs_{config.batch_size}__seed_{config.seed}'
     logger = StandardLogger(name='train', log_dir=log_dir)
     eval_logger = StandardLogger(name='val', log_dir=log_dir)
     logger.write(vars(config))
@@ -92,6 +84,8 @@ def main(config):
         instrument_iter=config.instrument_iter,
         instrument_tilde_iter=config.instrument_tilde_iter,
         treatment_iter=config.treatment_iter,
+        stage1_ent=config.stage1_ent,
+        stage2_ent=config.stage2_ent,
         dataset=dataset_loader,
         device=device,
         counter=counter,
@@ -197,8 +191,8 @@ if __name__ == "__main__":
     parser.add_argument("--instrument_learning_rate", type=float, default=1e-3)
     parser.add_argument("--stage1_reg", type=float, default=1e-5)
     parser.add_argument("--stage2_reg", type=float, default=1e-5)
-    parser.add_argument("--stage1_ent", type=float, default=0.1)
-    parser.add_argument("--stage2_ent", type=float, default=0.1)
+    parser.add_argument("--stage1_ent", type=float, default=1e-3)
+    parser.add_argument("--stage2_ent", type=float, default=1e-3)
     parser.add_argument("--lagrange_reg", type=float, default=0.3)
     parser.add_argument("--instrument_iter", type=int, default=10)
     parser.add_argument("--instrument_tilde_iter", type=int, default=10)
@@ -206,9 +200,23 @@ if __name__ == "__main__":
     parser.add_argument("--max_dev_size", type=int, default=10 * 1024)
     parser.add_argument("--evaluate_every", type=int, default=100)
     parser.add_argument("--evaluate_init_samples", type=int, default=1000)
-    parser.add_argument("--max_steps", type=int, default=5000)
+    parser.add_argument("--max_steps", type=int, default=10000)
     parser.add_argument("--noise_level", type=float, default=0.1)
     parser.add_argument("--policy_noise_level", type=float, default=0.0)
+    parser.add_argument("--seed", type=int, default=0)
 
     config = parser.parse_args()
+
+    global device
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    random.seed(config.seed)
+    np.random.seed(config.seed)
+    torch.manual_seed(config.seed)
+    torch.cuda.manual_seed(config.seed)
+    torch.cuda.manual_seed_all(config.seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    torch.use_deterministic_algorithms(True, warn_only=True)
+
     main(config)
