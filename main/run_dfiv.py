@@ -39,7 +39,7 @@ def behavior_policy(obs_batch: torch.Tensor, policy_dqn: torch.nn.Module, epsilo
 
 def main(config):
     # Load pretrained DQN network
-    policy_dqn = utils.load_pretrained_dqn("policy_net.pth", device=device)
+    policy_dqn = utils.load_pretrained_dqn(f"pretrained_dqns/policy_net_{config.noise_level}.pth", device=device)
 
     # Load the offline dataset and environment.
     dataset_loader, dev_loader, env, env_spec = utils.load_data_and_env(
@@ -168,8 +168,8 @@ def main(config):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--value_layer_sizes", type=str, default="50")
-    parser.add_argument("--instrumental_layer_sizes", type=str, default="50")
+    parser.add_argument("--value_layer_sizes", type=str, default="50, 50")
+    parser.add_argument("--instrumental_layer_sizes", type=str, default="50, 50")
     parser.add_argument("--batch_size", type=int, default=1024)
     parser.add_argument("--value_learning_rate", type=float, default=1e-4)
     parser.add_argument("--instrumental_learning_rate", type=float, default=1e-3)
@@ -177,12 +177,12 @@ if __name__ == "__main__":
     parser.add_argument("--stage2_reg", type=float, default=1e-5)
     parser.add_argument("--instrumental_reg", type=float, default=1e-5)
     parser.add_argument("--value_reg", type=float, default=1e-5)
-    parser.add_argument("--instrumental_iter", type=int, default=1)
+    parser.add_argument("--instrumental_iter", type=int, default=10)
     parser.add_argument("--value_iter", type=int, default=1)
     parser.add_argument("--max_dev_size", type=int, default=10 * 1024)
     parser.add_argument("--evaluate_every", type=int, default=100)
     parser.add_argument("--evaluate_init_samples", type=int, default=1000)
-    parser.add_argument("--max_steps", type=int, default=10000)
+    parser.add_argument("--max_steps", type=int, default=100_000)
     parser.add_argument("--noise_level", type=float, default=0.1)
     parser.add_argument("--policy_noise_level", type=float, default=0.0)
     parser.add_argument("--seed", type=int, default=0)

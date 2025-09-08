@@ -2,4 +2,4 @@
 /bsuite_near_policy/
 /results/
 /datasets/
-policy_net.pth
+/pretrained_dqns/

@@ -70,13 +70,14 @@ def load_data_and_env(
     env, env_spec = make_environment(task_name, noise_level)
 
     # 2. Collect dataset
-    if os.path.exists("datasets/dqn_gererated_dataset.pkl"):
-        with open("datasets/dqn_gererated_dataset.pkl", "rb") as f:
+    if os.path.exists(f"datasets/dqn_generated_dataset_{noise_level}.pkl"):
+        with open(f"datasets/dqn_generated_dataset_{noise_level}.pkl", "rb") as f:
             dataset = pickle.load(f)
     else:
+        print("Offline dataset not found. Generating new dataset...")
         dataset = collect_offline_dataset(env, num_episodes=2000, policy=policy, device=device)
-        os.makedirs(os.path.dirname('datasets/dqn_gererated_dataset.pkl'), exist_ok=True)  # make sure folder exists
-        with open("datasets/dqn_gererated_dataset.pkl", "wb") as f:
+        os.makedirs(os.path.dirname(f'datasets/dqn_generated_dataset_{noise_level}.pkl'), exist_ok=True)  # make sure folder exists
+        with open(f"datasets/dqn_generated_dataset_{noise_level}.pkl", "wb") as f:
             pickle.dump(dataset, f)
 
     # 3. Convert to tensors

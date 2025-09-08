@@ -17,14 +17,14 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import argparse
 import json
+import pickle
 
-
-def target_policy(obs_batch: torch.Tensor, policy_dqn: torch.nn.Module) -> torch.Tensor:
+def behaviour_policy(obs_batch: torch.Tensor, policy_dqn: torch.nn.Module) -> torch.Tensor:
     with torch.no_grad():
         return policy_dqn(obs_batch).argmax(dim=-1)
 
 
-def behavior_policy(obs_batch: torch.Tensor, policy_dqn: torch.nn.Module, epsilon=0.2) -> torch.Tensor:
+def target_policy(obs_batch: torch.Tensor, policy_dqn: torch.nn.Module, epsilon=0.2) -> torch.Tensor:
     """
     Policy that follows the trained DQN policy but with probability epsilon takes a random action.
     """
@@ -39,20 +39,18 @@ def behavior_policy(obs_batch: torch.Tensor, policy_dqn: torch.nn.Module, epsilo
 
 
 def main(config):
-    policy_dqn = utils.load_pretrained_dqn("policy_net.pth", device=device)
+    policy_dqn = utils.load_pretrained_dqn(f"pretrained_dqns/policy_net_{config.noise_level}.pth", device=device)
 
     dataset_loader, dev_loader, env, env_spec = utils.load_data_and_env(
         task_name="CartPole-v1",
         noise_level=config.noise_level,
-        policy=partial(behavior_policy, policy_dqn=policy_dqn, 
-                       epsilon=config.policy_noise_level),
+        policy=partial(behaviour_policy, policy_dqn=policy_dqn),
         batch_size=config.batch_size,
         max_dev_size=config.max_dev_size,
         device=device
     )
 
     treatment_net, instrument_net, instrument_tilde_net = f2bmld.make_ope_networks(
-        "bsuite_cartpole",
         env_spec,
         treatment_layer_sizes=config.treatment_layer_sizes,
         instrument_layer_sizes=config.instrument_layer_sizes,
@@ -74,7 +72,7 @@ def main(config):
         treatment_net=treatment_net,
         instrument_net=instrument_net,
         instrument_tilde_net=instrument_tilde_net,
-        policy=partial(target_policy, policy_dqn=policy_dqn),
+        policy=partial(target_policy, policy_dqn=policy_dqn, epsilon=config.policy_noise_level),
         discount=0.99,
         treatment_learning_rate=config.treatment_learning_rate,
         instrument_learning_rate=config.instrument_learning_rate,
@@ -92,7 +90,8 @@ def main(config):
         logger=logger)
     
     truth_value = utils.estimate_true_value(
-        partial(target_policy, policy_dqn=policy_dqn), env, discount=0.99, num_episodes=100, device=device
+        partial(target_policy, policy_dqn=policy_dqn, epsilon=config.policy_noise_level),
+        env, discount=0.99, num_episodes=100, device=device
     )
     print(f"Ground-truth policy treatment: {truth_value}")
 
@@ -137,7 +136,7 @@ def main(config):
                 eval_results["dev_mse"] = learner.cal_validation_err(dev_loader)
             eval_results.update(utils.ope_evaluation(
                 treatment_net,
-                policy=partial(target_policy, policy_dqn=policy_dqn),
+                policy=partial(target_policy, policy_dqn=policy_dqn, epsilon=config.policy_noise_level),
                 environment=env,
                 num_init_samples=config.evaluate_init_samples,
                 discount=0.99,
@@ -179,6 +178,8 @@ def main(config):
             torch.save(treatment_net.state_dict(), f"{log_dir}/treatment_net.pth")
             torch.save(instrument_net.state_dict(), f"{log_dir}/instrument_net.pth")
             torch.save(instrument_tilde_net.state_dict(), f"{log_dir}/instrument_tilde_net.pth")
+            with open(f"{log_dir}/eval_df.pkl", "wb") as f:
+                pickle.dump(eval_df, f)
             break
 
 if __name__ == "__main__":

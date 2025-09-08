@@ -19,8 +19,4 @@ def make_ope_networks(
         )
     else:
         raise ValueError(f"task id {task_id} not supported (only bsuite in Torch version).")
-
-    # In PyTorch we don't need tf2_utils.create_variables;
-    # networks are lazily created on first forward pass.
-
     return value_func, instrumental_feature
