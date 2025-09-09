@@ -21,10 +21,7 @@ class RandomActionWrapper(gym.Wrapper):
 def make_environment(env_name: str, noise_level: float = 0.0):
     """Create a Gymnasium environment and return it."""
     env = gym.make(env_name)
-
-    # Add random action noise if requested
-    if noise_level > 0.0:
-        env = RandomActionWrapper(env, eps=noise_level)
+    env = RandomActionWrapper(env, eps=noise_level)
 
     obs_dim = env.observation_space.shape[0]
     act_dim = env.action_space.n
@@ -48,8 +45,7 @@ def collect_offline_dataset(env, num_episodes, policy, device):
             obs_tensor = torch.tensor(obs, dtype=torch.float32, device=device).unsqueeze(0)
             action = policy(obs_tensor).cpu().numpy().squeeze(0).item()
             next_obs, reward, terminated, truncated, _ = env.step(action)
-            done = terminated or truncated
-            dataset.append((obs, action, reward, done, next_obs))
+            dataset.append((obs, action, reward, terminated, next_obs))
             obs = next_obs
 
     return dataset
@@ -84,10 +80,10 @@ def load_data_and_env(
     states = torch.tensor([d[0] for d in dataset], dtype=torch.float32)
     actions = torch.tensor([d[1] for d in dataset], dtype=torch.long)
     rewards = torch.tensor([d[2] for d in dataset], dtype=torch.float32)
-    dones = torch.tensor([d[3] for d in dataset], dtype=torch.float32)
+    terminates = torch.tensor([d[3] for d in dataset], dtype=torch.float32)
     next_states = torch.tensor([d[4] for d in dataset], dtype=torch.float32)
     
-    full_dataset = TensorDataset(states, actions, rewards, dones, next_states)
+    full_dataset = TensorDataset(states, actions, rewards, terminates, next_states)
 
     # 4. Split into train/dev
     dev_size = min(max_dev_size, len(full_dataset) // 5)

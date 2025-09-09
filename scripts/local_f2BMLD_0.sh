@@ -4,7 +4,7 @@ do
   do
     for reg in 1e-5
     do
-      for env_noise in 0.3
+      for env_noise in 0.0
       do 
         for policy_noise in 0.1 0.3
       do

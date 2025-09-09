@@ -83,27 +83,27 @@ class F2BMLDLearner:
         return stage1_input_, stage2_input_
 
     def update_instrument(self, stage1_input):
-        current_obs, action, reward, dones, next_obs = stage1_input[:5]
+        current_obs, action, reward, terminates, next_obs = stage1_input[:5]
         next_action = self.policy(next_obs)
         target = self.treatment_net(current_obs, action).detach()
-        target = target - self.discount * (1 - dones[:, None]) * self.treatment_net(next_obs, next_action).detach()
+        target = target - self.discount * (1 - terminates[:, None]) * self.treatment_net(next_obs, next_action).detach()
 
         loss = ((target - self.instrument_net(current_obs, action)) ** 2).mean()
         loss += self.stage1_reg * sum(p.pow(2).sum() for p in self.instrument_net.parameters())
 
         self._instrument_optimizer.zero_grad()
         loss.backward()
-        torch.nn.utils.clip_grad_value_(self.instrument_net.parameters(), 10)
+        # torch.nn.utils.clip_grad_value_(self.instrument_net.parameters(), 10)
         self._instrument_optimizer.step()
-        add_langevin_noise(self.instrument_net.parameters(), self.stage1_ent)
+        # add_langevin_noise(self.instrument_net.parameters(), self.stage1_ent)
         return loss.item()
 
     def update_instrument_tilde(self, stage1_input, stage2_input):
-        current_obs_1st, action_1st, reward_1st, dones_1st, next_obs_1st = stage1_input[:5]
-        current_obs_2nd, action_2nd, reward_2nd, dones_2nd, next_obs_2nd = stage2_input[:5]
+        current_obs_1st, action_1st, reward_1st, terminates_1st, next_obs_1st = stage1_input[:5]
+        current_obs_2nd, action_2nd, reward_2nd, terminates_2nd, next_obs_2nd = stage2_input[:5]
         next_action_1st = self.policy(next_obs_1st)
         target = self.treatment_net(current_obs_1st, action_1st).detach()
-        target = target - self.discount * (1 - dones_1st[:, None]) * self.treatment_net(next_obs_1st, next_action_1st).detach()
+        target = target - self.discount * (1 - terminates_1st[:, None]) * self.treatment_net(next_obs_1st, next_action_1st).detach()
 
         loss_1 = ((target - self.instrument_tilde_net(current_obs_1st, action_1st)) ** 2).mean()
         loss_2 = ((reward_2nd[:, None] - self.instrument_tilde_net(current_obs_2nd, action_2nd)) ** 2).mean()
@@ -112,20 +112,20 @@ class F2BMLDLearner:
 
         self._instrument_tilde_optimizer.zero_grad()
         loss.backward()
-        torch.nn.utils.clip_grad_value_(self.instrument_tilde_net.parameters(), 10)
+        # torch.nn.utils.clip_grad_value_(self.instrument_tilde_net.parameters(), 10)
         self._instrument_tilde_optimizer.step()
-        add_langevin_noise(self.instrument_tilde_net.parameters(), self.stage1_ent * self.lagrange_reg)
+        # add_langevin_noise(self.instrument_tilde_net.parameters(), self.stage1_ent * self.lagrange_reg)
         return loss.item()
     
 
     def update_treatment(self, stage1_input, stage2_input):
-        current_obs_1st, action_1st, reward_1st, dones_1st, next_obs_1st = stage1_input[:5]
-        current_obs_2nd, action_2nd, reward_2nd, dones_2nd, next_obs_2nd = stage2_input[:5]
+        current_obs_1st, action_1st, reward_1st, terminates_1st, next_obs_1st = stage1_input[:5]
+        current_obs_2nd, action_2nd, reward_2nd, terminates_2nd, next_obs_2nd = stage2_input[:5]
         next_action_1st = self.policy(next_obs_1st)
         next_action_2nd = self.policy(next_obs_2nd)
 
         target_1 = self.treatment_net(current_obs_1st, action_1st)
-        target_1 = target_1 - self.discount * (1 - dones_1st[:, None]) * self.treatment_net(next_obs_1st, next_action_1st)
+        target_1 = target_1 - self.discount * (1 - terminates_1st[:, None]) * self.treatment_net(next_obs_1st, next_action_1st)
         loss_1 = ((target_1 - self.instrument_tilde_net(current_obs_1st, action_1st)) ** 2).mean()
         loss_2 = ((target_1 - self.instrument_net(current_obs_1st, action_1st)) ** 2).mean()
         loss = self.lagrange_reg * (loss_1 - loss_2)
@@ -133,9 +133,9 @@ class F2BMLDLearner:
 
         self._treatment_optimizer.zero_grad()
         loss.backward()
-        torch.nn.utils.clip_grad_value_(self.treatment_net.parameters(), 10)
+        # torch.nn.utils.clip_grad_value_(self.treatment_net.parameters(), 10)
         self._treatment_optimizer.step()
-        add_langevin_noise(self.treatment_net.parameters(), self.stage2_ent)
+        # add_langevin_noise(self.treatment_net.parameters(), self.stage2_ent)
         return loss.item()
 
     def step(self):
