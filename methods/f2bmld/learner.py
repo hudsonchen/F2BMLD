@@ -93,6 +93,7 @@ class F2BMLDLearner:
 
         self._instrument_optimizer.zero_grad()
         loss.backward()
+        torch.nn.utils.clip_grad_value_(self.instrument_net.parameters(), 10)
         self._instrument_optimizer.step()
         add_langevin_noise(self.instrument_net.parameters(), self.stage1_ent)
         return loss.item()
@@ -111,6 +112,7 @@ class F2BMLDLearner:
 
         self._instrument_tilde_optimizer.zero_grad()
         loss.backward()
+        torch.nn.utils.clip_grad_value_(self.instrument_tilde_net.parameters(), 10)
         self._instrument_tilde_optimizer.step()
         add_langevin_noise(self.instrument_tilde_net.parameters(), self.stage1_ent * self.lagrange_reg)
         return loss.item()
@@ -131,6 +133,7 @@ class F2BMLDLearner:
 
         self._treatment_optimizer.zero_grad()
         loss.backward()
+        torch.nn.utils.clip_grad_value_(self.treatment_net.parameters(), 10)
         self._treatment_optimizer.step()
         add_langevin_noise(self.treatment_net.parameters(), self.stage2_ent)
         return loss.item()

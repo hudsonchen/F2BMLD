@@ -197,7 +197,7 @@ if __name__ == "__main__":
     parser.add_argument("--treatment_layer_sizes", type=str, default="50,1")
     parser.add_argument("--instrument_layer_sizes", type=str, default="50,1")
     parser.add_argument("--batch_size", type=int, default=128)
-    parser.add_argument("--treatment_learning_rate", type=float, default=1e-3)
+    parser.add_argument("--treatment_learning_rate", type=float, default=1e-4)
     parser.add_argument("--instrument_learning_rate", type=float, default=1e-3)
     parser.add_argument("--stage1_reg", type=float, default=1e-5)
     parser.add_argument("--stage2_reg", type=float, default=1e-5)
