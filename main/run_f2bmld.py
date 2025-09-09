@@ -19,12 +19,21 @@ import argparse
 import json
 import pickle
 
-def behaviour_policy(obs_batch: torch.Tensor, policy_dqn: torch.nn.Module) -> torch.Tensor:
+def target_policy(obs_batch: torch.Tensor, policy_dqn: torch.nn.Module, epsilon) -> torch.Tensor:
+    """
+    Policy that follows the trained DQN policy but with probability epsilon takes a random action.
+    """
     with torch.no_grad():
-        return policy_dqn(obs_batch).argmax(dim=-1)
+        greedy_actions = policy_dqn(obs_batch).argmax(dim=-1)  # [batch]
+    
+    random_mask = torch.rand(len(obs_batch)) < epsilon
+    random_actions = torch.randint(0, 2, size=(len(obs_batch),), dtype=torch.long).to(obs_batch.device)
+    final_actions = greedy_actions.clone()
+    final_actions[random_mask] = random_actions[random_mask]
+    return final_actions
 
 
-def target_policy(obs_batch: torch.Tensor, policy_dqn: torch.nn.Module, epsilon=0.2) -> torch.Tensor:
+def behaviour_policy(obs_batch: torch.Tensor, policy_dqn: torch.nn.Module, epsilon) -> torch.Tensor:
     """
     Policy that follows the trained DQN policy but with probability epsilon takes a random action.
     """
@@ -44,7 +53,7 @@ def main(config):
     dataset_loader, dev_loader, env, env_spec = utils.load_data_and_env(
         task_name="CartPole-v1",
         noise_level=config.noise_level,
-        policy=partial(behaviour_policy, policy_dqn=policy_dqn),
+        policy=partial(behaviour_policy, policy_dqn=policy_dqn, epsilon=0.1),
         batch_size=config.batch_size,
         max_dev_size=config.max_dev_size,
         device=device
@@ -187,13 +196,13 @@ if __name__ == "__main__":
 
     parser.add_argument("--treatment_layer_sizes", type=str, default="50,1")
     parser.add_argument("--instrument_layer_sizes", type=str, default="50,1")
-    parser.add_argument("--batch_size", type=int, default=32)
+    parser.add_argument("--batch_size", type=int, default=128)
     parser.add_argument("--treatment_learning_rate", type=float, default=1e-3)
     parser.add_argument("--instrument_learning_rate", type=float, default=1e-3)
     parser.add_argument("--stage1_reg", type=float, default=1e-5)
     parser.add_argument("--stage2_reg", type=float, default=1e-5)
-    parser.add_argument("--stage1_ent", type=float, default=1e-3)
-    parser.add_argument("--stage2_ent", type=float, default=1e-3)
+    parser.add_argument("--stage1_ent", type=float, default=1e-5)
+    parser.add_argument("--stage2_ent", type=float, default=1e-5)
     parser.add_argument("--lagrange_reg", type=float, default=0.3)
     parser.add_argument("--instrument_iter", type=int, default=10)
     parser.add_argument("--instrument_tilde_iter", type=int, default=10)
