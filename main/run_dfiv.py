@@ -16,14 +16,33 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import argparse
 import random
- 
+import pwd
 
-def target_policy(obs_batch: torch.Tensor, policy_dqn: torch.nn.Module) -> torch.Tensor:
+if pwd.getpwuid(os.getuid())[0] == 'zongchen':
+    os.chdir('/home/zongchen/F2BMLD/')
+    sys.path.append('/home/zongchen/F2BMLD/')
+elif pwd.getpwuid(os.getuid())[0] == 'ucabzc9':
+    os.chdir('/home/ucabzc9/Scratch/F2BMLD/')
+    sys.path.append('/home/ucabzc9/Scratch/F2BMLD/')
+else:
+    pass
+
+
+def target_policy(obs_batch: torch.Tensor, policy_dqn: torch.nn.Module, epsilon) -> torch.Tensor:
+    """
+    Policy that follows the trained DQN policy but with probability epsilon takes a random action.
+    """
     with torch.no_grad():
-        return policy_dqn(obs_batch).argmax(dim=-1)
+        greedy_actions = policy_dqn(obs_batch).argmax(dim=-1)  # [batch]
+    
+    random_mask = torch.rand(len(obs_batch)) < epsilon
+    random_actions = torch.randint(0, 2, size=(len(obs_batch),), dtype=torch.long).to(obs_batch.device)
+    final_actions = greedy_actions.clone()
+    final_actions[random_mask] = random_actions[random_mask]
+    return final_actions
 
 
-def behavior_policy(obs_batch: torch.Tensor, policy_dqn: torch.nn.Module, epsilon=0.2) -> torch.Tensor:
+def behaviour_policy(obs_batch: torch.Tensor, policy_dqn: torch.nn.Module, epsilon) -> torch.Tensor:
     """
     Policy that follows the trained DQN policy but with probability epsilon takes a random action.
     """
@@ -45,7 +64,7 @@ def main(config):
     dataset_loader, dev_loader, env, env_spec = utils.load_data_and_env(
         task_name="CartPole-v1",
         noise_level=config.noise_level,
-        policy=partial(behavior_policy, policy_dqn=policy_dqn, epsilon=config.policy_noise_level),
+        policy=partial(behaviour_policy, policy_dqn=policy_dqn, epsilon=0.1),
         batch_size=config.batch_size,
         max_dev_size=config.max_dev_size,
         device=device
@@ -68,7 +87,7 @@ def main(config):
     learner = dfiv.DFIVLearner(
         value_func=value_func,
         instrumental_feature=instrumental_feature,
-        policy=partial(target_policy, policy_dqn=policy_dqn),
+        policy=partial(target_policy, policy_dqn=policy_dqn, epsilon=config.policy_noise_level),
         discount=0.99,
         value_learning_rate=config.value_learning_rate,
         instrumental_learning_rate=config.instrumental_learning_rate,
@@ -83,10 +102,11 @@ def main(config):
         counter=counter,
         logger=logger)
     
-    truth_value = utils.estimate_true_value(
-        partial(target_policy, policy_dqn=policy_dqn), env, discount=0.99, num_episodes=100, device=device
+    truth_value, stderr_value = utils.estimate_true_value(
+        partial(target_policy, policy_dqn=policy_dqn, epsilon=config.policy_noise_level),
+        env, discount=0.99, num_episodes=100, device=device
     )
-    print(f"Ground-truth policy value: {truth_value}")
+    print(f"Ground-truth policy treatment: {truth_value} ± {stderr_value}")
 
     # Keep history outside loop
     train_logs = []
@@ -124,7 +144,7 @@ def main(config):
                 eval_results["dev_mse"] = learner.cal_validation_err(dev_loader)
             eval_results.update(utils.ope_evaluation(
                 value_func=value_func,
-                policy=partial(target_policy, policy_dqn=policy_dqn),
+                policy=partial(target_policy, policy_dqn=policy_dqn, epsilon=config.policy_noise_level),
                 environment=env,
                 num_init_samples=config.evaluate_init_samples,
                 discount=0.99,
@@ -182,7 +202,7 @@ if __name__ == "__main__":
     parser.add_argument("--max_dev_size", type=int, default=10 * 1024)
     parser.add_argument("--evaluate_every", type=int, default=100)
     parser.add_argument("--evaluate_init_samples", type=int, default=1000)
-    parser.add_argument("--max_steps", type=int, default=100_000)
+    parser.add_argument("--max_steps", type=int, default=10000)
     parser.add_argument("--noise_level", type=float, default=0.1)
     parser.add_argument("--policy_noise_level", type=float, default=0.0)
     parser.add_argument("--seed", type=int, default=0)
@@ -201,3 +221,4 @@ if __name__ == "__main__":
     torch.use_deterministic_algorithms(True, warn_only=True)
 
     main(config)
+    print("Done!")

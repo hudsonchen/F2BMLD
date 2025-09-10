@@ -101,10 +101,10 @@ class DFIVLearner:
         stage2_input_ = [x.to(self.device) for x in stage2_input]
         return stage1_input_, stage2_input_
 
-    def update_instrumental(self, current_obs, action, reward, dones, next_obs):
+    def update_instrumental(self, current_obs, action, reward, terminates, next_obs):
         next_action = self.policy(next_obs)
         target = add_const_col(self.value_feature(current_obs, action))
-        target = target - self.discount * (1 - dones[:, None]) * add_const_col(self.value_feature(next_obs, next_action))
+        target = target - self.discount * (1 - terminates[:, None]) * add_const_col(self.value_feature(next_obs, next_action))
 
         feature = self.instrumental_feature(current_obs, action)
         # Ridge regression loss approximation
@@ -118,15 +118,15 @@ class DFIVLearner:
         return loss.item()
 
     def update_value(self, stage1_input, stage2_input):
-        current_obs_1st, action_1st, _, dones_1st, next_obs_1st = stage1_input[:5]
-        current_obs_2nd, action_2nd, reward_2nd, dones_2nd, _ = stage2_input[:5]
+        current_obs_1st, action_1st, _, terminates_1st, next_obs_1st = stage1_input[:5]
+        current_obs_2nd, action_2nd, reward_2nd, terminates_2nd, _ = stage2_input[:5]
         next_action_1st = self.policy(next_obs_1st)
 
         instrumental_feature_1st = self.instrumental_feature(current_obs_1st, action_1st)
         instrumental_feature_2nd = self.instrumental_feature(current_obs_2nd, action_2nd)
 
         target_1st = add_const_col(self.value_feature(current_obs_1st, action_1st))
-        target_1st = target_1st - self.discount * (1 - dones_1st[:, None]) * add_const_col(
+        target_1st = target_1st - self.discount * (1 - terminates_1st[:, None]) * add_const_col(
             self.value_feature(next_obs_1st, next_action_1st)
         )
     
@@ -144,15 +144,15 @@ class DFIVLearner:
         return loss.item()
 
     def update_final_weight(self, stage1_input, stage2_input):
-        current_obs_1st, action_1st, _, dones_1st, next_obs_1st = stage1_input[:5]
-        current_obs_2nd, action_2nd, reward_2nd, dones_2nd, _ = stage2_input[:5]
+        current_obs_1st, action_1st, _, terminates_1st, next_obs_1st = stage1_input[:5]
+        current_obs_2nd, action_2nd, reward_2nd, terminates_2nd, _ = stage2_input[:5]
         next_action_1st = self.policy(next_obs_1st)
 
         instrumental_feature_1st = self.instrumental_feature(current_obs_1st, action_1st)
         instrumental_feature_2nd = self.instrumental_feature(current_obs_2nd, action_2nd)
 
         target_1st = add_const_col(self.value_feature(current_obs_1st, action_1st)) 
-        target_1st = target_1st - self.discount * (1 - dones_1st[:, None]) * add_const_col(self.value_feature(next_obs_1st, next_action_1st))
+        target_1st = target_1st - self.discount * (1 - terminates_1st[:, None]) * add_const_col(self.value_feature(next_obs_1st, next_action_1st))
         stage1_weight = fit_linear(target_1st, instrumental_feature_1st, self.stage1_reg)
         self.stage1_weight = stage1_weight.detach()
 
