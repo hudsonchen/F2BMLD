@@ -22,11 +22,11 @@ module -f unload compilers
 module load compilers/gnu/4.9.2
 module load python/miniconda3/4.10.3
 source $UCL_CONDA_PATH/etc/profile.d/conda.sh
-conda activate /lustre/home/ucabzc9/.conda/envs/cbq
+conda activate /lustre/home/ucabzc9/.conda/envs/F2BMLD
 date
 
 ## Check if the environment is correct.
 which pip
 which python
 
-python /home/ucabzc9/Scratch/nest_bq/BO.py $JOB_PARAMS
+python /home/ucabzc9/Scratch/F2BMLD/main/run_f2bmld.py $JOB_PARAMS

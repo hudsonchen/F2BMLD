@@ -1,6 +1,5 @@
 #$ -l tmem=2G
 #$ -l h_vmem=2G
-#$ -pe smp 32
 #$ -l h_rt=5:0:0
 #$ -R y
 #$ -S /bin/bash
