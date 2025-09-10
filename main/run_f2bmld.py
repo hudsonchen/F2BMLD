@@ -242,3 +242,4 @@ if __name__ == "__main__":
     print("Configuration:")
     print(config)
     main(config)
+    print("Done!")

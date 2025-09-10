@@ -7,7 +7,7 @@ command_template = (
     "--max_steps {steps}"
 )
 
-noise = 0.1
+noise = 0.2
 
 # Open the file toy_local.sh in write mode
 with open(f'/home/zongchen/F2BMLD/scripts/cs_cluster/configs_noise_{noise}.txt', 'w') as file:
@@ -15,7 +15,7 @@ with open(f'/home/zongchen/F2BMLD/scripts/cs_cluster/configs_noise_{noise}.txt',
     for seed in range(5):
         for policy_noise in [0.0, 0.1]:
                 for lagrange in [0.1, 0.3]:
-                    for steps in [50_000]:
+                    for steps in [80_000]:
                         command = command_template.format(
                             seed=seed,
                             policy_noise=policy_noise,
