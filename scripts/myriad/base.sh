@@ -22,8 +22,8 @@ module -f unload compilers
 module load compilers/gnu/4.9.2
 module load python/miniconda3/4.10.3
 source $UCL_CONDA_PATH/etc/profile.d/conda.sh
-# conda activate /lustre/home/ucabzc9/.conda/envs/F2BMLD
-conda activate /home/ucabzc9/.conda/envs/F2BMLD
+conda activate /myriadfs/home/ucabzc9/.conda/envs/F2BMLD
+# conda activate /home/ucabzc9/.conda/envs/F2BMLD
 date
 
 ## Check if the environment is correct.
