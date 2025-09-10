@@ -97,12 +97,12 @@ def main(config):
         device=device,
         counter=counter,
         logger=logger)
-    
-    truth_value = utils.estimate_true_value(
+
+    truth_value, stderr_value = utils.estimate_true_value(
         partial(target_policy, policy_dqn=policy_dqn, epsilon=config.policy_noise_level),
         env, discount=0.99, num_episodes=100, device=device
     )
-    print(f"Ground-truth policy treatment: {truth_value}")
+    print(f"Ground-truth policy treatment: {truth_value} ± {stderr_value}")
 
     # Keep history outside loop
     train_logs = []

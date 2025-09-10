@@ -35,16 +35,16 @@ def make_environment(env_name: str, noise_level: float = 0.0):
 
 
 def collect_offline_dataset(env, num_episodes, policy, device):
-    """Collect offline dataset from the environment using a behavior policy."""
     dataset = []
 
     for _ in tqdm(range(num_episodes)):
         obs, _ = env.reset()
-        done = False
-        while not done:
+        terminated, truncated = False, False
+        while not (terminated or truncated):
             obs_tensor = torch.tensor(obs, dtype=torch.float32, device=device).unsqueeze(0)
             action = policy(obs_tensor).cpu().numpy().squeeze(0).item()
             next_obs, reward, terminated, truncated, _ = env.step(action)
+
             dataset.append((obs, action, reward, terminated, next_obs))
             obs = next_obs
 

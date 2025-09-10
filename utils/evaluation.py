@@ -116,4 +116,5 @@ def estimate_true_value(policy, environment, discount=0.99,
         returns.append(ep_return)
 
     mean_return = float(np.mean(returns))
-    return mean_return
+    stderr_return = float(np.std(returns, ddof=0) / np.sqrt(len(returns)))
+    return mean_return, stderr_return

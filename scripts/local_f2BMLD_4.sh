@@ -4,9 +4,9 @@ do
   do
     for reg in 1e-5
     do
-      for env_noise in 0.2
+      for env_noise in 0.4
       do 
-        for policy_noise in 0.3 0.1
+        for policy_noise in 0.0 0.1
       do
         /home/zongchen/miniconda3/envs/F2BMLD/bin/python \
         ~/F2BMLD/main/run_f2bmld.py --policy_noise_level $policy_noise --noise_level $env_noise --lagrange_reg $lag --stage1_reg $reg --stage2_reg $reg --seed $seed --batch_size 1024 --max_steps 50_000
