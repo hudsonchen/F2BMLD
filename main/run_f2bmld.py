@@ -18,6 +18,16 @@ import matplotlib.pyplot as plt
 import argparse
 import json
 import pickle
+import pwd
+
+if pwd.getpwuid(os.getuid())[0] == 'zongchen':
+    os.chdir('/home/zongchen/F2BMLD/')
+    sys.path.append('/home/zongchen/F2BMLD/')
+elif pwd.getpwuid(os.getuid())[0] == 'ucabzc9':
+    os.chdir('/home/ucabzc9/Scratch/F2BMLD/')
+    sys.path.append('/home/ucabzc9/Scratch/F2BMLD/')
+else:
+    pass
 
 def target_policy(obs_batch: torch.Tensor, policy_dqn: torch.nn.Module, epsilon) -> torch.Tensor:
     """
