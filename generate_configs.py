@@ -16,7 +16,7 @@ with open(f'/home/zongchen/F2BMLD/scripts/myriad/configs_noise_{noise}.txt', 'w'
     for seed in range(5):
         for policy_noise in [0.0, 0.1]:
                 for lagrange in [0.1, 0.3]:
-                    for steps in [500_000]:
+                    for steps in [50000]:
                         command = command_template.format(
                             seed=seed,
                             policy_noise=policy_noise,
