@@ -8,7 +8,7 @@ command_template = (
     "--batch_size 32"
 )
 
-noise = 0.3
+noise = 0.4
 
 # Open the file toy_local.sh in write mode
 with open(f'/home/zongchen/F2BMLD/scripts/myriad/configs_noise_{noise}.txt', 'w') as file:
