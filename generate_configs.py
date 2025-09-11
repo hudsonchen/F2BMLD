@@ -4,7 +4,8 @@ command_template = (
     "--noise_level {noise} "
     "--lagrange_reg {lagrange} "
     "--seed {seed} "
-    "--max_steps {steps}"
+    "--max_steps {steps} "
+    "--batch_size 32"
 )
 
 noise = 0.3

@@ -1,20 +1,20 @@
---policy_noise_level 0.0 --noise_level 0.3 --lagrange_reg 0.1 --seed 0 --max_steps 500000
---policy_noise_level 0.0 --noise_level 0.3 --lagrange_reg 0.3 --seed 0 --max_steps 500000
---policy_noise_level 0.1 --noise_level 0.3 --lagrange_reg 0.1 --seed 0 --max_steps 500000
---policy_noise_level 0.1 --noise_level 0.3 --lagrange_reg 0.3 --seed 0 --max_steps 500000
---policy_noise_level 0.0 --noise_level 0.3 --lagrange_reg 0.1 --seed 1 --max_steps 500000
---policy_noise_level 0.0 --noise_level 0.3 --lagrange_reg 0.3 --seed 1 --max_steps 500000
---policy_noise_level 0.1 --noise_level 0.3 --lagrange_reg 0.1 --seed 1 --max_steps 500000
---policy_noise_level 0.1 --noise_level 0.3 --lagrange_reg 0.3 --seed 1 --max_steps 500000
---policy_noise_level 0.0 --noise_level 0.3 --lagrange_reg 0.1 --seed 2 --max_steps 500000
---policy_noise_level 0.0 --noise_level 0.3 --lagrange_reg 0.3 --seed 2 --max_steps 500000
---policy_noise_level 0.1 --noise_level 0.3 --lagrange_reg 0.1 --seed 2 --max_steps 500000
---policy_noise_level 0.1 --noise_level 0.3 --lagrange_reg 0.3 --seed 2 --max_steps 500000
---policy_noise_level 0.0 --noise_level 0.3 --lagrange_reg 0.1 --seed 3 --max_steps 500000
---policy_noise_level 0.0 --noise_level 0.3 --lagrange_reg 0.3 --seed 3 --max_steps 500000
---policy_noise_level 0.1 --noise_level 0.3 --lagrange_reg 0.1 --seed 3 --max_steps 500000
---policy_noise_level 0.1 --noise_level 0.3 --lagrange_reg 0.3 --seed 3 --max_steps 500000
---policy_noise_level 0.0 --noise_level 0.3 --lagrange_reg 0.1 --seed 4 --max_steps 500000
---policy_noise_level 0.0 --noise_level 0.3 --lagrange_reg 0.3 --seed 4 --max_steps 500000
---policy_noise_level 0.1 --noise_level 0.3 --lagrange_reg 0.1 --seed 4 --max_steps 500000
---policy_noise_level 0.1 --noise_level 0.3 --lagrange_reg 0.3 --seed 4 --max_steps 500000
+--policy_noise_level 0.0 --noise_level 0.3 --lagrange_reg 0.1 --seed 0 --max_steps 500000 --batch_size 32
+--policy_noise_level 0.0 --noise_level 0.3 --lagrange_reg 0.3 --seed 0 --max_steps 500000 --batch_size 32
+--policy_noise_level 0.1 --noise_level 0.3 --lagrange_reg 0.1 --seed 0 --max_steps 500000 --batch_size 32
+--policy_noise_level 0.1 --noise_level 0.3 --lagrange_reg 0.3 --seed 0 --max_steps 500000 --batch_size 32
+--policy_noise_level 0.0 --noise_level 0.3 --lagrange_reg 0.1 --seed 1 --max_steps 500000 --batch_size 32
+--policy_noise_level 0.0 --noise_level 0.3 --lagrange_reg 0.3 --seed 1 --max_steps 500000 --batch_size 32
+--policy_noise_level 0.1 --noise_level 0.3 --lagrange_reg 0.1 --seed 1 --max_steps 500000 --batch_size 32
+--policy_noise_level 0.1 --noise_level 0.3 --lagrange_reg 0.3 --seed 1 --max_steps 500000 --batch_size 32
+--policy_noise_level 0.0 --noise_level 0.3 --lagrange_reg 0.1 --seed 2 --max_steps 500000 --batch_size 32
+--policy_noise_level 0.0 --noise_level 0.3 --lagrange_reg 0.3 --seed 2 --max_steps 500000 --batch_size 32
+--policy_noise_level 0.1 --noise_level 0.3 --lagrange_reg 0.1 --seed 2 --max_steps 500000 --batch_size 32
+--policy_noise_level 0.1 --noise_level 0.3 --lagrange_reg 0.3 --seed 2 --max_steps 500000 --batch_size 32
+--policy_noise_level 0.0 --noise_level 0.3 --lagrange_reg 0.1 --seed 3 --max_steps 500000 --batch_size 32
+--policy_noise_level 0.0 --noise_level 0.3 --lagrange_reg 0.3 --seed 3 --max_steps 500000 --batch_size 32
+--policy_noise_level 0.1 --noise_level 0.3 --lagrange_reg 0.1 --seed 3 --max_steps 500000 --batch_size 32
+--policy_noise_level 0.1 --noise_level 0.3 --lagrange_reg 0.3 --seed 3 --max_steps 500000 --batch_size 32
+--policy_noise_level 0.0 --noise_level 0.3 --lagrange_reg 0.1 --seed 4 --max_steps 500000 --batch_size 32
+--policy_noise_level 0.0 --noise_level 0.3 --lagrange_reg 0.3 --seed 4 --max_steps 500000 --batch_size 32
+--policy_noise_level 0.1 --noise_level 0.3 --lagrange_reg 0.1 --seed 4 --max_steps 500000 --batch_size 32
+--policy_noise_level 0.1 --noise_level 0.3 --lagrange_reg 0.3 --seed 4 --max_steps 500000 --batch_size 32
