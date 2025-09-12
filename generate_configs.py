@@ -8,12 +8,12 @@ command_template = (
     "--batch_size 32"
 )
 
-noise = 0.1
+noise = 0.0
 
 # Open the file toy_local.sh in write mode
 with open(f'/home/zongchen/F2BMLD/scripts/myriad/configs_noise_{noise}.txt', 'w') as file:
     # Generate commands for seeds 0 to 100 and write each to the file
-    for seed in range(5):
+    for seed in range(5, 11):
         for policy_noise in [0.0, 0.1]:
                 for lagrange in [0.1, 0.3]:
                     for steps in [50000]:
