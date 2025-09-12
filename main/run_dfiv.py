@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 import argparse
 import random
 import pwd
+import pickle
 
 if pwd.getpwuid(os.getuid())[0] == 'zongchen':
     os.chdir('/home/zongchen/F2BMLD/')
@@ -183,6 +184,8 @@ def main(config):
         if steps >= config.max_steps:
             torch.save(value_func.state_dict(), f"{log_dir}/value_func.pth")
             torch.save(instrumental_feature.state_dict(), f"{log_dir}/instrumental_feature.pth")
+            with open(f"{log_dir}/eval_df.pkl", "wb") as f:
+                pickle.dump(eval_df, f)
             break
 
 if __name__ == "__main__":
