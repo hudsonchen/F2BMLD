@@ -1,4 +1,4 @@
-# Nested Kernel Quadrature
+# Fully-First order Bilevel Mean-field Langevin Dynamics (F$^2$BMLD)
 
 This repository contains the implementation of the code for the paper "Towards a Unified Analysis of Neural Networks in Nonparametric Instrumental Variable Regression: Optimization and Generalization". 
 
