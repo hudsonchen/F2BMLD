@@ -11,9 +11,9 @@ pip install -r requirements.txt
 
 ## Reproducing Results
 
-### 1. Synthetic Experiment
+### Offline Policy Evaluation
 
-To reproduce the results for the synthetic experiment (Figure 2 (Left)), run the following command:
+To reproduce the results for the experiment (Figure 1), run the following command:
 
 `python main/run_f2bmld.py --policy_noise_level 0.0 --noise_level 0.2 --lagrange_reg 0.3 --seed 0 --max_steps 50_000 --batch_size 32`
 
