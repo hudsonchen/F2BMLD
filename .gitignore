@@ -4,3 +4,8 @@
 /datasets/
 /pretrained_dqns/
 /results_new/
+/plotting_notebooks/
+/figures/
+/utils/__pycache__/
+/__pycache__/
+/.vscode/
